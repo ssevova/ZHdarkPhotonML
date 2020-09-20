@@ -1,0 +1,4 @@
+[submodule "hpogrid"]
+	path = hpogrid
+	url = ssh://git@gitlab.cern.ch:7999/aml/hyperparameter-optimization/alkaid-qt/hpogrid.git
+	branch = master

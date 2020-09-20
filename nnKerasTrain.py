@@ -18,8 +18,6 @@ class DarkPhoton_NN(tune.Trainable):
 
         import tensorflow as tf
 
-
-
         model = tf.keras.models.Sequential()
         model.add(tf.keras.layers.Dense(self.n1, activation="relu",kernel_initializer=self.init_mode, input_shape=(len(varw)-1,)))
         model.add(tf.keras.layers.Dropout(self.dr))
@@ -37,13 +35,12 @@ class DarkPhoton_NN(tune.Trainable):
         self.model = model
 
     def _train(self):                
-
         import pandas as pd
         import sklearn.model_selection as model_selection
         import sklearn as skl
         import sklearn_pandas as skp
         
-        all_data = pd.read_csv("/afs/cern.ch/work/s/ssevova/public/dark-photon-atlas/zhdarkphotonml/all_data")
+        all_data = pd.read_csv("user.ssevova:mc16d_v08_ZHyyD_all_data_NNtraintest.csv")
         all_data = all_data[all_data['w']>0]
 
         # Load the data & split by train/test
@@ -86,7 +83,5 @@ class DarkPhoton_NN(tune.Trainable):
             "test_loss": test_loss,
             "test_accuracy": test_acc
         }
-
-
   
            
