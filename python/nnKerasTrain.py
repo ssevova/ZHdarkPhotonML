@@ -45,9 +45,10 @@ class DarkPhoton_NN(tune.Trainable):
 
         data_directory = hpogrid.get_datadir()
         print("inDS dir: {}".format(data_directory))
-        data_file = glob.glob(data_directory+"*.csv")
-        print("--> inDS file: {}".format(data_file))
-        all_data = pd.read_csv(data_file)
+        data_files = glob.glob(data_directory+"*.csv")
+        print("--> inDS file: {}".format(data_files))
+        for f in data_files:
+            all_data = pd.read_csv(f)
         all_data = all_data[all_data['w']>0]
 
         # Load the data & split by train/test
