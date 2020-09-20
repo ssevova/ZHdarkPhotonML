@@ -81,13 +81,19 @@ class DarkPhoton_NN(tune.Trainable):
                                  validation_data=(X_test, y_test))
         
         train_loss, train_acc = self.model.evaluate(X_train, y_train, verbose=2)
-        test_loss, test_acc = self.model.evaluate(X_test, y_test, verbose=2)
-
+        test_loss, test_acc   = self.model.evaluate(X_test, y_test, verbose=2)
+        
+        probs = self.model.predict(X_test)
+        predictions = self.model.predict_classes(X_test)
+        fpr,tpr,threshold = skl.metrics.roc_curve(y_test,probs,sample_weight=wtest_unscaled)
+        auc = skl.metrics.auc(fpr,tpr) 
+        
         # It is important to return tf.Tensors as numpy objects.
         return {
             "epoch": self.iteration,
             "loss": train_loss,
             "accuracy": train_acc,
+            "auc": auc,
             "test_loss": test_loss,
             "test_accuracy": test_acc
         }
