@@ -1,4 +1,5 @@
 import argparse
+
 # ray tune
 from ray import tune
 # Variables of interest
@@ -39,8 +40,14 @@ class DarkPhoton_NN(tune.Trainable):
         import sklearn.model_selection as model_selection
         import sklearn as skl
         import sklearn_pandas as skp
-        
-        all_data = pd.read_csv("user.ssevova:mc16d_v08_ZHyyD_all_data_NNtraintest.csv")
+        import hpogrid
+        import glob
+
+        data_directory = hpogrid.get_datadir()
+        print("inDS dir: {}".format(data_directory))
+        data_file = glob.glob(data_directory+"*.csv")
+        print("--> inDS file: {}".format(data_file))
+        all_data = pd.read_csv(data_file)
         all_data = all_data[all_data['w']>0]
 
         # Load the data & split by train/test
