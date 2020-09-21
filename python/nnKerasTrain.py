@@ -9,8 +9,8 @@ class DarkPhoton_NN(tune.Trainable):
     def _setup(self, config):
         self.epochs = config.get("epochs",50)
         self.dense_layers = config.get("dense_layers",2)
-        self.top_layer_neurons = config.get("top_layer_neurons",160)
-        self.bot_layer_neurons = config.get("bot_layer_neurons",160)
+        self.top_layer_neurons = config.get("top_layer_neurons",256)
+        self.bot_layer_neurons = config.get("bot_layer_neurons",16)
         self.dense_activation = config.get("dense_activation","relu")
         '''
         self.n1 = config.get("n1", 160)
@@ -30,7 +30,7 @@ class DarkPhoton_NN(tune.Trainable):
             if layer == 0: 
                 model.add(tf.keras.layers.Dense(self.top_layer_neurons, activation=self.dense_activation,kernel_initializer=self.init_mode, input_shape=(len(varw)-1,)))
             else: 
-                if layer < self.dense_layers/2:
+                if layer <= self.dense_layers/2:
                     model.add(tf.keras.layers.Dense(self.top_layer_neurons, activation=self.dense_activation, kernel_initializer=self.init_mode))
                 else: 
                     model.add(tf.keras.layers.Dense(self.bot_layer_neurons, activation=self.dense_activation, kernel_initializer=self.init_mode))
