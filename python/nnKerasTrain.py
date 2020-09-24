@@ -1,12 +1,10 @@
 import argparse
 # ray tune
 from ray import tune
-# Variables of interest
-varw = ['met_tight_tst_et','met_tight_tst_phi','mT','ph_pt','dphi_mety_ll','AbsPt','Ptll','mllg','lep1pt','lep2pt','mll','metsig_tst','Ptllg','dphi_met_ph','w']
 
 class DarkPhoton_NN(tune.Trainable):
 
-    def _setup(self, config):
+    def setup(self, config):
         self.epochs = config.get("epochs",50)
         self.dense_layers = config.get("dense_layers",2)
         self.top_layer_neurons = config.get("top_layer_neurons",256)
@@ -25,10 +23,13 @@ class DarkPhoton_NN(tune.Trainable):
         self.run_mode = config.get("run_mode","local")
         import tensorflow as tf
 
+        self.varw = config.get("varslist",['met_tight_tst_et'])
+        #['met_tight_tst_et','met_tight_tst_phi','mT','ph_pt','dphi_mety_ll','AbsPt','Ptll','mllg','lep1pt','lep2pt','mll','metsig_tst','Ptllg','dphi_met_ph','w']
+
         model = tf.keras.models.Sequential()
         for layer in range(self.dense_layers):
             if layer == 0: 
-                model.add(tf.keras.layers.Dense(self.top_layer_neurons, activation=self.dense_activation,kernel_initializer=self.init_mode, input_shape=(len(varw)-1,)))
+                model.add(tf.keras.layers.Dense(self.top_layer_neurons, activation=self.dense_activation,kernel_initializer=self.init_mode, input_shape=(len(self.varw)-1,)))
             else: 
                 if layer <= self.dense_layers/2:
                     model.add(tf.keras.layers.Dense(self.top_layer_neurons, activation=self.dense_activation, kernel_initializer=self.init_mode))
@@ -43,7 +44,7 @@ class DarkPhoton_NN(tune.Trainable):
         print(model.summary())
         self.model = model
 
-    def _train(self):                
+    def step(self):                
         import pandas as pd
         import sklearn.model_selection as model_selection
         import sklearn as skl
@@ -68,8 +69,8 @@ class DarkPhoton_NN(tune.Trainable):
         X = all_data
         y = all_data['event']
         X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y,test_size=0.3, random_state=0)
-        X_train = X_train[varw]
-        X_test = X_test[varw]
+        X_train = X_train[self.varw]
+        X_test = X_test[self.varw]
         cols = X_train.columns
         itrain = X_train.index
         itest = X_test.index
@@ -85,9 +86,9 @@ class DarkPhoton_NN(tune.Trainable):
         wtrain = X_scaled_train['w']
 
         # Deal with weights
-        varw.remove("w")
-        X_train = X_scaled_train[varw]
-        X_test = X_scaled_test[varw]
+        self.varw.remove("w")
+        X_train = X_scaled_train[self.varw]
+        X_test = X_scaled_test[self.varw]
         
         history = self.model.fit(X_train, y_train, epochs=self.epochs,
                                  batch_size=self.batchsize,
