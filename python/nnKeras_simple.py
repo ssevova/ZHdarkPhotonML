@@ -17,6 +17,7 @@ import uproot as up
 import uproot_methods
 import pandas as pd
 import matplotlib.pyplot as plt
+
 # sklearn
 from sklearn.model_selection import GridSearchCV
 from keras.models import Sequential
@@ -40,11 +41,7 @@ from keras.constraints import maxnorm
 from keras.optimizers import Adam
 from keras.optimizers import RMSprop
 from sklearn_pandas import DataFrameMapper
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RandomizedSearchCV
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RandomizedSearchCV
 #keras
 from keras.layers import Dropout
 from keras.constraints import maxnorm
@@ -61,7 +58,7 @@ def getArgumentParser():
                         '--infile',
                         dest='infile',
                         help='Input CSV file',
-                        default = '/afs/cern.ch/user/e/ehofgard/public/data/all_data')
+                        default = '/afs/cern.ch/work/s/ssevova/public/dark-photon-atlas/zhdarkphotonml/samples/v09/mc16d_v09_samples.csv')
     parser.add_argument('-o',
                         '--output',
                         dest='outdir',
@@ -73,18 +70,16 @@ def getArgumentParser():
 def create_model(input_dim):
     # create model
     model = Sequential()
-    model.add(Dense(180,activation='relu',input_dim = input_dim,kernel_initializer='lecun_uniform',kernel_constraint=maxnorm(5)))
-    #model.add(Dropout(0.1))
-    model.add(Dense(130, activation='relu',kernel_initializer='lecun_uniform',kernel_constraint=maxnorm(5)))
-    #,kernel_constraint=maxnorm(3)
-    #model.add(Dropout(0.1))
-    model.add(Dense(105,activation='relu',kernel_initializer='lecun_uniform',kernel_constraint=maxnorm(5)))
-    #,kernel_constraint=maxnorm(3)))
-    #model.add(Dropout(0.1))
-    model.add(Dense(25,activation='relu',kernel_initializer='lecun_uniform',kernel_constraint=maxnorm(5)))
-    #model.add(Dropout(0.1))
-    optimizer = RMSprop(learning_rate=0.01)
-    model.add(Dense(1, activation='sigmoid'))
+    model.add(Dense(256,activation='relu',input_dim = input_dim,kernel_initializer='glorot_normal'))
+    model.add(Dropout(0.813755))
+    model.add(Dense(256, activation='relu',kernel_initializer='glorot_normal'))
+    model.add(Dropout(0.813755))
+    model.add(Dense(64,activation='relu',kernel_initializer='glorot_normal'))
+    model.add(Dropout(0.813755))
+    model.add(Dense(1, activation='sigmoid',kernel_initializer='glorot_normal'))
+
+    optimizer = RMSprop(learning_rate=0.001720)
+
     # Compile model
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy','AUC','Recall'])
     return model
@@ -184,7 +179,7 @@ def main():
     itest = X_test.index
     wtest_unscaled = X_test['w']
     # Scaling 
-    mapper = DataFrameMapper([(cols,StandardScaler())])
+    mapper = DataFrameMapper([(cols,preprocessing.StandardScaler())])
     scaled_train = mapper.fit_transform(X_train.copy(),len(cols))
     scaled_test = mapper.fit_transform(X_test.copy(),len(cols))
     X_scaled_train = pd.DataFrame(scaled_train,index = itrain, columns=cols)
@@ -197,7 +192,7 @@ def main():
     X_train = X_scaled_train[varw]
     X_test = X_scaled_test[varw]
     model = create_model(len(varw))
-    history = model.fit(X_train,y_train,batch_size = 64,verbose = 0, epochs=100,validation_data=(X_test, y_test))
+    history = model.fit(X_train,y_train,batch_size = 1024,verbose = 0, epochs=100,validation_data=(X_test, y_test))
     #, shuffle=True)#sample_weight=wtrain)
     plot_history(history)
     probs = model.predict(X_test)
