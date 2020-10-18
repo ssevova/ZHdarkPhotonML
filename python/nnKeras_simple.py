@@ -63,27 +63,35 @@ def getArgumentParser():
                         default='outdir')
     parser.add_argument('--plotInputs',action='store_true', help='Plot scaled train & test inputs')
     parser.add_argument('--plotOutputs',action='store_true', help='Plot scaled test outputs for given probability range')
-    parser.add_argument('--plotCorrelationInputs',action='store_true',help='Plot correlation matrices for scaled train & test inputs')
-    parser.add_argument('--plotCorrelationOutPuts',action='store_true',help='Plot correlation matrices for scaled train & test inputs for given probability range')
+    #parser.add_argument('--plotCorrelationInputs',action='store_true',help='Plot correlation matrices for scaled train & test inputs')
+    #parser.add_argument('--plotCorrelationOutPuts',action='store_true',help='Plot correlation matrices for scaled train & test inputs for given probability range')
 
     return parser
 ##############################################################################
 def create_model(input_dim):
     # create model
     model = Sequential()
-    model.add(Dense(256,activation='relu',input_dim = input_dim,kernel_initializer='glorot_normal'))
-    model.add(Dropout(0.813755))
-    model.add(Dense(256, activation='relu',kernel_initializer='glorot_normal'))
-    model.add(Dropout(0.813755))
-    model.add(Dense(64,activation='relu',kernel_initializer='glorot_normal'))
-    model.add(Dropout(0.813755))
-    model.add(Dense(1, activation='sigmoid',kernel_initializer='glorot_normal'))
+    #model.add(Dense(256,activation='relu',input_dim = input_dim,kernel_initializer='glorot_normal'))
+    model.add(Dense(256,activation='relu',input_dim = input_dim,kernel_initializer='normal'))
+    #model.add(Dropout(0.813755))
+    model.add(Dropout(0.668516))
+    model.add(Dense(256,activation='relu',input_dim = input_dim,kernel_initializer='normal'))
+    model.add(Dropout(0.668516))
+    model.add(Dense(256,activation='relu',input_dim = input_dim,kernel_initializer='normal'))
+    model.add(Dropout(0.668516))
+    model.add(Dense(16,activation='relu',kernel_initializer='normal'))
+    model.add(Dropout(0.668516))
+    model.add(Dense(1, activation='sigmoid',kernel_initializer='normal'))
 
-    optimizer = RMSprop(learning_rate=0.001720)
+    optimizer = RMSprop(learning_rate=0.002834)
 
     # Compile model
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy','AUC','Recall'])
     return model
+
+def plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test,varw):
+    X_scaled_train['event'] = y_train
+    X_scaled_test['event'] = y_test
 
 def plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test,varw):
     X_scaled_train['event'] = y_train
@@ -135,12 +143,15 @@ def correlations(data,data_type, **kwds):
     plt.savefig("Correlations_"+data_type+".pdf")
 def plot_outputs(X_test, y_test, varw):
     X_test['event'] = y_test
-    X_test_filt = X_test[(X_test['prob'] >= 0.2) & (X_test['prob'] <= 0.4)]
-    varw.remove('w')
-    sig_test_filt = np.array(X_test_filt[X_test_filt['event']==1])
-    bkg_test_filt = np.array(X_test_filt[X_test_filt['event']==0])
-    correlations(bkg_test_filt,'Bkg')
-    correlations(sig_test_filt,'Sig') 
+    X_test_filt = X_test[(X_test['prob'] >= 0.7) & (X_test['prob'] <= 0.9)]
+    #varw.remove('w')
+    sig_test_filt_df = X_test_filt[X_test_filt['event']==1]
+    sig_test_filt = np.array(sig_test_filt_df)
+    bkg_test_filt_df = X_test_filt[X_test_filt['event']==0]
+    bkg_test_filt = np.array(bkg_test_filt_df)
+
+    correlations(bkg_test_filt_df,'Bkg')
+    correlations(sig_test_filt_df,'Sig') 
     for var in varw:
         if var=='w': continue
         sig_test_filt = np.array(X_test_filt[X_test_filt['event']==1][var])
@@ -269,14 +280,13 @@ def main():
     model = create_model(len(varw))
     history = model.fit(X_train,y_train,batch_size = 1024,verbose = 0, epochs=100,validation_data=(X_test, y_test))
     #, shuffle=True)#sample_weight=wtrain)
-    print('==> Plotting training model history...')
-    plot_history(history)
-
-    probs_test = model.predict(X_test)
     probs_train = model.predict(X_train)
     # Not sure if I need this here
     
     predictions = (model.predict(X_test) > 0.5).astype("int32")
+    probs_test = model.predict(X_test)
+    probs_train = model.predict(X_train)
+
     X_test['prob']  = probs_test
     X_train['prob'] = probs_train
     
