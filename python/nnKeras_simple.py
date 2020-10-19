@@ -63,8 +63,8 @@ def getArgumentParser():
                         default='outdir')
     parser.add_argument('--plotInputs',action='store_true', help='Plot scaled train & test inputs')
     parser.add_argument('--plotOutputs',action='store_true', help='Plot scaled test outputs for given probability range')
-    #parser.add_argument('--plotCorrelationInputs',action='store_true',help='Plot correlation matrices for scaled train & test inputs')
-    #parser.add_argument('--plotCorrelationOutPuts',action='store_true',help='Plot correlation matrices for scaled train & test inputs for given probability range')
+    parser.add_argument('--lower',help='Lower limit for conditional filtering')
+    parser.add_argument('--upper',help='Upper limit for conditional filtering')
 
     return parser
 ##############################################################################
@@ -89,28 +89,6 @@ def create_model(input_dim):
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy','AUC','Recall'])
     return model
 
-def plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test,varw):
-    X_scaled_train['event'] = y_train
-    X_scaled_test['event'] = y_test
-
-def plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test,varw):
-    X_scaled_train['event'] = y_train
-    X_scaled_test['event'] = y_test
-    for var in varw:
-        if var=='w': continue
-        sig_scaled_train = np.array(X_scaled_train[X_scaled_train['event']==1][var])
-        bkg_scaled_train = np.array(X_scaled_train[X_scaled_train['event']==0][var])
-        sig_scaled_test = np.array(X_scaled_test[X_scaled_test['event']==1][var])
-        bkg_scaled_test = np.array(X_scaled_test[X_scaled_test['event']==0][var])
-        plt.clf()
-        plt.hist(sig_scaled_train, bins=50, range=(-1,1), histtype='step', color='Blue',label='Train Sig (scaled)')
-        plt.hist(bkg_scaled_train, bins=50, range=(-1,1), histtype='step', color='Red',label='Train Bkg (scaled)')
-        plt.hist(sig_scaled_test, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Blue',label='Test Sig (scaled)')
-        plt.hist(bkg_scaled_test, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Red',label='Test Bkg (scaled)')
-        plt.xlabel(var)
-        plt.ylabel('Events')
-        plt.legend()
-        plt.savefig('input_scaled_train_test_'+var+'.pdf')
 
 def correlations(data,data_type, **kwds):
     """Calculate pairwise correlation between features.
@@ -141,28 +119,72 @@ def correlations(data,data_type, **kwds):
         
     plt.tight_layout()
     plt.savefig("Correlations_"+data_type+".pdf")
-def plot_outputs(X_test, y_test, varw):
+
+def plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test,varw):
+    X_scaled_train['event'] = y_train
+    X_scaled_test['event'] = y_test
+    sig_test_df = X_scaled_test[X_scaled_test['event']==1]
+    bkg_test_df = X_scaled_test[X_scaled_test['event']==0]
+    sig_train_df = X_scaled_train[X_scaled_train['event']==1]
+    bkg_train_df = X_scaled_train[X_scaled_train['event']==0]
+
+    correlations(bkg_test_df,'Background Test')
+    correlations(sig_test_df,'Signal Test')
+    correlations(bkg_train_df,'Background Train')
+    correlations(sig_train_df,'Signal Train')
+
+    for var in varw:
+        if var=='w': continue
+        sig_scaled_train = np.array(X_scaled_train[X_scaled_train['event']==1][var])
+        bkg_scaled_train = np.array(X_scaled_train[X_scaled_train['event']==0][var])
+        sig_scaled_test = np.array(X_scaled_test[X_scaled_test['event']==1][var])
+        bkg_scaled_test = np.array(X_scaled_test[X_scaled_test['event']==0][var])
+        plt.clf()
+        plt.hist(sig_scaled_train, bins=50, range=(-1,1), histtype='step', color='Blue',label='Train Sig (scaled)')
+        plt.hist(bkg_scaled_train, bins=50, range=(-1,1), histtype='step', color='Red',label='Train Bkg (scaled)')
+        plt.hist(sig_scaled_test, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Blue',label='Test Sig (scaled)')
+        plt.hist(bkg_scaled_test, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Red',label='Test Bkg (scaled)')
+        plt.xlabel(var)
+        plt.ylabel('Events')
+        plt.legend()
+        plt.savefig('input_scaled_train_test_'+var+'.pdf')
+
+def plot_outputs(X_test, y_test, X_train,y_train,varw,lower,upper):
     X_test['event'] = y_test
-    X_test_filt = X_test[(X_test['prob'] >= 0.7) & (X_test['prob'] <= 0.9)]
+    X_test_filt = X_test[(X_test['prob'] >= lower) & (X_test['prob'] <= upper)]
     #varw.remove('w')
     sig_test_filt_df = X_test_filt[X_test_filt['event']==1]
     sig_test_filt = np.array(sig_test_filt_df)
     bkg_test_filt_df = X_test_filt[X_test_filt['event']==0]
     bkg_test_filt = np.array(bkg_test_filt_df)
 
-    correlations(bkg_test_filt_df,'Bkg')
-    correlations(sig_test_filt_df,'Sig') 
+    X_train['event']=y_train
+    X_train_filt = X_train[(X_train['prob'] >= lower) & (X_train['prob'] <= upper)]
+    sig_train_filt_df = X_train_filt[X_train_filt['event']==1]
+    sig_train_filt = np.array(sig_train_filt_df)
+    bkg_train_filt_df = X_train_filt[X_train_filt['event']==0]
+    bkg_train_filt = np.array(bkg_train_filt_df)
+    
+    correlations(bkg_test_filt_df,'Background Test '+str(lower)+'-'+str(upper))
+    correlations(sig_test_filt_df,'Signal Test '+str(lower)+'-'+str(upper)) 
+    correlations(bkg_train_filt_df,'Background Train '+str(lower)+'-'+str(upper))
+    correlations(sig_train_filt_df,'Signal Train '+str(lower)+'-'+str(upper))
+
     for var in varw:
         if var=='w': continue
         sig_test_filt = np.array(X_test_filt[X_test_filt['event']==1][var])
         bkg_test_filt = np.array(X_test_filt[X_test_filt['event']==0][var])
+        sig_train_filt = np.array(X_train_filt[X_train_filt['event']==1][var])
+        bkg_train_filt = np.array(X_train_filt[X_train_filt['event']==1][var])
         plt.clf()
-        plt.hist(sig_test_filt, bins=50, range=(-1,1), histtype='step', color='Blue',label='Test Sig (scaled)')
-        plt.hist(bkg_test_filt, bins=50, range=(-1,1), histtype='step', color='Red',label='Test Bkg (scaled)')
+        plt.hist(sig_train_filt, bins=50, range=(-1,1), histtype='step', color='Blue',label='Train Sig (scaled)')
+        plt.hist(bkg_train_filt, bins=50, range=(-1,1), histtype='step', color='Red',label='Train Bkg (scaled)')
+        plt.hist(sig_test_filt, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Blue',label='Test Sig (scaled)')
+        plt.hist(bkg_test_filt, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Red',label='Test Bkg (scaled)')
         plt.xlabel(var)
         plt.ylabel('Events')
         plt.legend()
-        plt.savefig('output_scaled_cond_test_'+var+'.pdf')
+        plt.savefig('output_scaled_cond_train_test_'+var+'.pdf')
 
 def plot_roc(fpr,tpr,roc_auc):
     plt.clf()
@@ -269,7 +291,7 @@ def main():
     wtrain = X_scaled_train['w']
     if options.plotInputs:
         print('==> Plotting scaled inputs...')
-        plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test, varw)    
+        plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test, varw)
     # Deal with weights
     # Build and train the classifier model
     varw.remove("w")
@@ -292,7 +314,7 @@ def main():
     
     if options.plotOutputs:
 
-        plot_outputs(X_test, y_test, varw)
+        plot_outputs(X_test, y_test, X_train,y_train,varw,float(options.lower),float(options.upper))
 
     fpr,tpr,threshold = metrics.roc_curve(y_test,probs_test,sample_weight=wtest_unscaled)
     auc = metrics.auc(fpr,tpr)
