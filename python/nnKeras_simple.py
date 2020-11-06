@@ -25,6 +25,7 @@ from keras.wrappers.scikit_learn import KerasClassifier
 from keras.constraints import maxnorm
 from keras.optimizers import Adam
 from keras.optimizers import RMSprop
+import tensorflow as tf
 
 # sklearn
 from sklearn.model_selection import GridSearchCV
@@ -63,29 +64,77 @@ def getArgumentParser():
                         default='outdir')
     parser.add_argument('--plotInputs',action='store_true', help='Plot scaled train & test inputs')
     parser.add_argument('--plotOutputs',action='store_true', help='Plot scaled test outputs for given probability range')
+    parser.add_argument('--lower',help='Lower limit for conditional filtering')
+    parser.add_argument('--upper',help='Upper limit for conditional filtering')
 
     return parser
 ##############################################################################
 def create_model(input_dim):
     # create model
     model = Sequential()
+    #model.add(Dense(256,activation='relu',input_dim = input_dim,kernel_initializer='normal'))
+    #model.add(Dropout(0.668516))
     model.add(Dense(256,activation='relu',input_dim = input_dim,kernel_initializer='glorot_normal'))
-    model.add(Dropout(0.813755))
+    model.add(Dropout(0.807438))
     model.add(Dense(256, activation='relu',kernel_initializer='glorot_normal'))
-    model.add(Dropout(0.813755))
-    model.add(Dense(64,activation='relu',kernel_initializer='glorot_normal'))
-    model.add(Dropout(0.813755))
+    model.add(Dropout(0.807438))
+    model.add(Dense(16,activation='relu',kernel_initializer='glorot_normal'))
+    model.add(Dropout(0.807438))
     model.add(Dense(1, activation='sigmoid',kernel_initializer='glorot_normal'))
 
-    optimizer = RMSprop(learning_rate=0.001720)
+    optimizer = RMSprop(learning_rate=0.000762)
+    #,momentum=0.845658)
+
+    #,momentum = 0.83559,centered=True)
 
     # Compile model
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy','AUC','Recall'])
     return model
 
+
+def correlations(data,data_type, **kwds):
+    """Calculate pairwise correlation between features.
+    
+    Extra arguments are passed on to DataFrame.corr()
+    """
+    # simply call df.corr() to get a table of
+    # correlation values if you do not need
+    # the fancy plotting
+    corrmat = data.corr(**kwds)
+
+    fig, ax1 = plt.subplots(ncols=1, figsize=(6,5))
+    
+    opts = {'cmap': plt.get_cmap("RdBu"),
+            'vmin': -1, 'vmax': +1}
+    heatmap1 = ax1.pcolor(corrmat, **opts)
+    plt.colorbar(heatmap1, ax=ax1)
+
+    ax1.set_title("Correlations "+data_type)
+
+    labels = corrmat.columns.values
+    for ax in (ax1,):
+        # shift location of ticks to center of the bins
+        ax.set_xticks(np.arange(len(labels))+0.5, minor=False)
+        ax.set_yticks(np.arange(len(labels))+0.5, minor=False)
+        ax.set_xticklabels(labels, minor=False, ha='right', rotation=70)
+        ax.set_yticklabels(labels, minor=False)
+        
+    plt.tight_layout()
+    plt.savefig("Correlations_"+data_type+".pdf")
+
 def plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test,varw):
     X_scaled_train['event'] = y_train
     X_scaled_test['event'] = y_test
+    sig_test_df = X_scaled_test[X_scaled_test['event']==1].drop(columns=['event','w'])
+    bkg_test_df = X_scaled_test[X_scaled_test['event']==0].drop(columns=['event','w'])
+    sig_train_df = X_scaled_train[X_scaled_train['event']==1].drop(columns=['event','w'])
+    bkg_train_df = X_scaled_train[X_scaled_train['event']==0].drop(columns=['event','w'])
+
+    correlations(bkg_test_df,'Background Test')
+    correlations(sig_test_df,'Signal Test')
+    correlations(bkg_train_df,'Background Train')
+    correlations(sig_train_df,'Signal Train')
+
     for var in varw:
         if var=='w': continue
         sig_scaled_train = np.array(X_scaled_train[X_scaled_train['event']==1][var])
@@ -93,29 +142,56 @@ def plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test,varw):
         sig_scaled_test = np.array(X_scaled_test[X_scaled_test['event']==1][var])
         bkg_scaled_test = np.array(X_scaled_test[X_scaled_test['event']==0][var])
         plt.clf()
-        plt.hist(sig_scaled_train, bins=50, range=(-1,1), histtype='step', color='Blue',label='Train Sig (scaled)')
-        plt.hist(bkg_scaled_train, bins=50, range=(-1,1), histtype='step', color='Red',label='Train Bkg (scaled)')
-        plt.hist(sig_scaled_test, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Blue',label='Test Sig (scaled)')
-        plt.hist(bkg_scaled_test, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Red',label='Test Bkg (scaled)')
+        plt.hist(sig_scaled_train, bins=50, range=(-1,1), histtype='step', color='Blue',label='Train Sig (scaled)',density=True)
+        plt.hist(bkg_scaled_train, bins=50, range=(-1,1), histtype='step', color='Red',label='Train Bkg (scaled)',density=True)
+        plt.hist(sig_scaled_test, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Blue',label='Test Sig (scaled)',density=True)
+        plt.hist(bkg_scaled_test, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Red',label='Test Bkg (scaled)',density=True)
         plt.xlabel(var)
         plt.ylabel('Events')
         plt.legend()
         plt.savefig('input_scaled_train_test_'+var+'.pdf')
 
-def plot_outputs(X_test, y_test, varw):
+def plot_outputs(X_test, y_test, X_train,y_train,varw,lower,upper):
     X_test['event'] = y_test
-    X_test_filt = X_test[(X_test['prob'] >= 0.2) & (X_test['prob'] <= 0.4)]
+    X_test_filt = X_test[(X_test['prob'] >= lower) & (X_test['prob'] <= upper)]
+    #varw.remove('w')
+    sig_test_filt_df = X_test_filt[X_test_filt['event']==1]
+    sig_test_filt = np.array(sig_test_filt_df)
+    bkg_test_filt_df = X_test_filt[X_test_filt['event']==0]
+    bkg_test_filt = np.array(bkg_test_filt_df)
+
+    X_train['event']=y_train
+    X_train_filt = X_train[(X_train['prob'] >= lower) & (X_train['prob'] <= upper)]
+    sig_train_filt_df = X_train_filt[X_train_filt['event']==1]
+    sig_train_filt = np.array(sig_train_filt_df)
+    bkg_train_filt_df = X_train_filt[X_train_filt['event']==0]
+    bkg_train_filt = np.array(bkg_train_filt_df)
+    
+    correlations(bkg_test_filt_df.drop(columns=['event','prob']),'Background Test '+str(lower)+'-'+str(upper))
+    correlations(sig_test_filt_df.drop(columns=['event','prob']),'Signal Test '+str(lower)+'-'+str(upper)) 
+    correlations(bkg_train_filt_df.drop(columns=['event','prob']),'Background Train '+str(lower)+'-'+str(upper))
+    correlations(sig_train_filt_df.drop(columns=['event','prob']),'Signal Train '+str(lower)+'-'+str(upper))
+
     for var in varw:
         if var=='w': continue
         sig_test_filt = np.array(X_test_filt[X_test_filt['event']==1][var])
         bkg_test_filt = np.array(X_test_filt[X_test_filt['event']==0][var])
+        sig_train_filt = np.array(X_train_filt[X_train_filt['event']==1][var])
+        bkg_train_filt = np.array(X_train_filt[X_train_filt['event']==0][var])
+        sig_train = np.array(X_train[X_train['event']==1][var])
+        bkg_train = np.array(X_test[X_test['event']==0][var])
         plt.clf()
-        plt.hist(sig_test_filt, bins=50, range=(-1,1), histtype='step', color='Blue',label='Test Sig (scaled)')
-        plt.hist(bkg_test_filt, bins=50, range=(-1,1), histtype='step', color='Red',label='Test Bkg (scaled)')
+        # Changing to plotting previous distributions and filtered distribution
+        plt.hist(sig_train_filt, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2,color='Blue',label='Train Sig Filtered (scaled)',density=True)
+        plt.hist(bkg_train_filt, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2,color='Red',label='Train Bkg Filtered (scaled)',density=True)
+        plt.hist(sig_train, bins=50, range=(-1,1), histtype='step', color='Blue',label='Train Sig (scaled)',density=True)
+        plt.hist(bkg_train, bins=50, range=(-1,1), histtype='step', color='Red',label='Train Bkg (scaled)',density=True)
+        #plt.hist(sig_test_filt, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Blue',label='Test Sig (scaled)',density=True)
+        #plt.hist(bkg_test_filt, bins=50, range=(-1,1), histtype='stepfilled', alpha=0.2, color='Red',label='Test Bkg (scaled)',density=True)
         plt.xlabel(var)
         plt.ylabel('Events')
         plt.legend()
-        plt.savefig('output_scaled_cond_test_'+var+'.pdf')
+        plt.savefig('output_scaled_cond_train_test_'+var+'.pdf')
 
 def plot_roc(fpr,tpr,roc_auc):
     plt.clf()
@@ -205,6 +281,8 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(X, y,test_size=0.3, random_state=0)
     seed = 7
     np.random.seed(seed)
+    # setting tensorflow random seed
+    tf.random.set_seed(seed)
     X_train = X_train[varw]
     X_test = X_test[varw]
     cols = X_train.columns
@@ -222,7 +300,7 @@ def main():
     wtrain = X_scaled_train['w']
     if options.plotInputs:
         print('==> Plotting scaled inputs...')
-        plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test, varw)    
+        plot_inputs(X_scaled_train, X_scaled_test, y_train, y_test, varw)
     # Deal with weights
     # Build and train the classifier model
     varw.remove("w")
@@ -233,19 +311,20 @@ def main():
     model = create_model(len(varw))
     history = model.fit(X_train,y_train,batch_size = 1024,verbose = 0, epochs=100,validation_data=(X_test, y_test))
     #, shuffle=True)#sample_weight=wtrain)
-    print('==> Plotting training model history...')
-    plot_history(history)
-
+    probs_train = model.predict(X_train)
+    # Not sure if I need this here
+    
+    predictions = (model.predict(X_test) > 0.5).astype("int32")
     probs_test = model.predict(X_test)
     probs_train = model.predict(X_train)
+
     X_test['prob']  = probs_test
     X_train['prob'] = probs_train
     
     if options.plotOutputs:
 
-        plot_outputs(X_test, y_test, varw)
+        plot_outputs(X_test, y_test, X_train,y_train,varw,float(options.lower),float(options.upper))
 
-    predictions = (model.predict(X_test) > 0.5).astype("int32")
     fpr,tpr,threshold = metrics.roc_curve(y_test,probs_test,sample_weight=wtest_unscaled)
     auc = metrics.auc(fpr,tpr)
 
@@ -272,3 +351,4 @@ def main():
 if __name__ == '__main__':
     main()
            
+
